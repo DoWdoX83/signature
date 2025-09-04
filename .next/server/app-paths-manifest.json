@@ -1,11 +1,11 @@
 {
-  "/favicon.ico/route": "app/favicon.ico/route.js",
   "/_not-found/page": "app/_not-found/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
   "/api/document/[id]/route": "app/api/document/[id]/route.js",
   "/api/send-email/route": "app/api/send-email/route.js",
   "/api/upload/route": "app/api/upload/route.js",
   "/api/sign/route": "app/api/sign/route.js",
-  "/sign/[id]/page": "app/sign/[id]/page.js",
   "/page": "app/page.js",
+  "/sign/[id]/page": "app/sign/[id]/page.js",
   "/view/[id]/page": "app/view/[id]/page.js"
 }

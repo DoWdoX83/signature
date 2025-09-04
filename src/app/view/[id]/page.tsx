@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 import path from "path";
 import { promises as fs } from "fs";
 
-export default async function ViewPage({ params }: { params: { id: string } }) {
-  const { id } = params;
+export default async function ViewPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const uploadsDir = path.join(process.cwd(), "public", "uploads");
   const pdfPath = path.join(uploadsDir, `${id}.pdf`);
   try {

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
