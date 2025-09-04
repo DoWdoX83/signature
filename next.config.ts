@@ -1,7 +1,12 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from "next"
+
+const isProd = process.env.NODE_ENV === "production"
+const repo = "signature"
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  output: "export",
+  images: { unoptimized: true },
+  trailingSlash: true,
+}
 
-export default nextConfig;
+export default nextConfig
