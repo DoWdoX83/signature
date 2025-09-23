@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "export": "echo 'Skipping static export (deploying on Vercel).'"
+    "export": "node scripts/placeholder-export.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.56.0",
