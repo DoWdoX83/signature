@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Dropzone from "react-dropzone";
 import SignaturePad from "react-signature-canvas";
 import { QRCodeCanvas } from "qrcode.react";
+import { createClient } from "@supabase/supabase-js";
 
 type Uploaded = { id: string; url: string } | null;
 
@@ -147,6 +148,45 @@ export default function Home() {
       } catch {}
     };
   }, [pdfPreviewUrl]);
+
+  // Realtime when visiting desktop with a docId present (watch for new/updated doc)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const dId = params.get("docId");
+    const isMob = params.get("isMobile") === "true";
+    if (!dId || isMob) return;
+
+    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
+    const SUPABASE_KEY = (process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_ANON_KEY) as string | undefined;
+    if (!SUPABASE_URL || !SUPABASE_KEY) return;
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const channel = supabase
+      .channel("documents-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "Documents", filter: `id=eq.${dId}` },
+        (payload: any) => {
+          try {
+            const row = payload?.new ?? payload?.record ?? null;
+            const id = row?.id || dId;
+            // Refresh viewer to latest document
+            setUploaded({ id, url: "" });
+            setPdfPreviewUrl(`/api/document/${id}?disposition=inline`);
+            // Open modal to let user download/send
+            setIsSigModalOpen(true);
+          } catch {}
+        }
+      )
+      .subscribe((status) => {
+        // no-op; could track status
+      });
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch {}
+    };
+  }, []);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
