@@ -6,7 +6,7 @@ import { signedDocumentMail } from "@/mails/signedDocument";
 
 export async function POST(request: Request) {
   try {
-    const { advisor, client, url, docId }: { advisor?: string; client?: string; url?: string; docId?: string } = await request.json();
+    const { advisor, client, url, docId, name }: { advisor?: string; client?: string; url?: string; docId?: string; name?: string } = await request.json();
     if (!advisor || !client || !docId) {
       return NextResponse.json({ error: "Missing advisor or client" }, { status: 400 });
     }
@@ -26,9 +26,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Signed document not found" }, { status: 404 });
     }
 
+    const safeName = (name && name.trim()) ? name.trim() : `document-signe-${docId}`;
     const attachments: Attachment[] = [
       {
-        Name: `document-signe-${docId}.pdf`,
+        Name: `${safeName}.pdf`,
         Content: data.doc,
         ContentType: "application/pdf",
         ContentID: null,

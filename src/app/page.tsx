@@ -68,6 +68,7 @@ export default function Home() {
   const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(null);
   const [advisorEmail, setAdvisorEmail] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [documentName, setDocumentName] = useState("");
   const [isMobile, setIsMobile] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string>("");
   const [isMobileQuery, setIsMobileQuery] = useState(false);
@@ -219,7 +220,7 @@ export default function Home() {
       await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ advisor: advisorEmail.trim(), client: clientEmail.trim(), url: qrUrl, docId: uploaded?.id }),
+        body: JSON.stringify({ advisor: advisorEmail.trim(), client: clientEmail.trim(), url: qrUrl, docId: uploaded?.id, name: documentName.trim() || undefined }),
       });
       setIsSigModalOpen(false);
     } catch {}
@@ -353,6 +354,16 @@ export default function Home() {
           <div onClick={(e) => e.stopPropagation()} className="bg-white p-6 rounded-2xl max-w-[90vw] w-[560px] text-left">
             <h3 className="text-center">Envoyer le document par email</h3>
             <div className="mt-5">
+              <label className="block text-sm text-[#495057] mb-1">Nom du document (optionnel)</label>
+              <input
+                type="text"
+                value={documentName}
+                onChange={(e) => setDocumentName(e.target.value)}
+                placeholder="Ex: Contrat de prêt signé"
+                className="w-full border border-[var(--border-subtle)] rounded-xl px-3.5 py-2.5 outline-none"
+              />
+            </div>
+            <div className="mt-4">
               <label className="block text-sm text-[#495057] mb-1">Email conseiller</label>
               <input
                 type="email"
@@ -374,7 +385,7 @@ export default function Home() {
             </div>
             <div className="mt-6 flex justify-center gap-3">
               <a
-                href={uploaded?.id ? `/api/document/${uploaded.id}` : "#"}
+                href={uploaded?.id ? (`/api/document/${uploaded.id}` + (documentName.trim() ? `?name=${encodeURIComponent(documentName.trim())}` : "")) : "#"}
                 className="rounded-xl px-4 py-2 border border-[var(--border-subtle)] cursor-pointer"
                 download
               >

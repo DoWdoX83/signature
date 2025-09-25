@@ -35,34 +35,47 @@ export async function POST(request: Request) {
     // Try to find a form field whose name equals/contains 'signature'
     const form = pdfDoc.getForm();
     // Identify the exact widget location; avoid any default/fallback placement
-    let pageIndex = -1;
+    let targetPage: any = undefined;
     let x = 0, y = 0, w = 0, h = 0;
     let candidate: any = null;
     try {
       const allFields = (form as any).getFields?.() ?? [];
-      const found = (allFields as any[]).find((f: any) => {
+      // Prefer exact name match first
+      let found = (allFields as any[]).find((f: any) => {
+        try { return String(f?.getName?.()) === "signatureZone"; } catch { return false; }
+      });
+      if (!found) found = (allFields as any[]).find((f: any) => {
         const n = f?.getName?.() ?? "";
         const lower = String(n).toLowerCase();
         return lower === "signaturezone" || lower.includes("signature");
       });
       candidate = found ?? (form as any).getField?.("signatureZone");
-      const widgets = candidate?.acroField?.getWidgets?.() ?? [];
+      const widgets = (candidate as any)?.getWidgets?.() ?? candidate?.acroField?.getWidgets?.() ?? [];
       if (widgets.length > 0) {
         // If multiple widgets exist, prefer the last (often later pages)
         const widget = widgets[widgets.length - 1];
         const rect = widget.getRectangle();
-        const pRef = widget.P();
-        const pIdx = pdfDoc.getPages().findIndex((p: any) => p.ref === pRef);
-        if (pIdx >= 0) pageIndex = pIdx;
+        const p = widget.getPage?.() ?? undefined;
+        if (p) targetPage = p;
+        if (!targetPage) {
+          const pRef = widget.P?.() ?? undefined;
+          if (pRef) {
+            const pRefStr = pRef?.toString?.();
+            const pagesAll = pdfDoc.getPages();
+            const matched = pagesAll.find((pg: any) => pg?.ref?.toString?.() === pRefStr);
+            if (matched) targetPage = matched;
+          }
+        }
         x = rect.x;
         y = rect.y;
         w = rect.width;
         h = rect.height;
+        console.log(`[signature placement] field=${candidate?.getName?.()} pageSet=${!!targetPage} rect=(${x},${y},${w},${h})`);
       }
     } catch {}
 
     const pages = pdfDoc.getPages();
-    const page = pageIndex >= 0 ? pages[pageIndex] : undefined;
+    if (!targetPage) targetPage = pages[pages.length - 1] ?? pages[0];
     // Embed as PNG or JPEG depending on data
     let image;
     try {
@@ -82,8 +95,8 @@ export async function POST(request: Request) {
         placed = true;
       } catch {}
     }
-    if (!placed && pageIndex >= 0 && page) {
-      page.drawImage(image, { x: offsetX, y: offsetY, width: drawW, height: drawH, opacity: 1 });
+    if (!placed && targetPage) {
+      targetPage.drawImage(image, { x: offsetX, y: offsetY, width: drawW, height: drawH, opacity: 1 });
     }
     try { form.flatten(); } catch {}
 
@@ -107,5 +120,3 @@ export async function POST(request: Request) {
 }
 
 export const dynamic = "force-dynamic";
-
-

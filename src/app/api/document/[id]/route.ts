@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
@@ -25,10 +25,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     const buffer = Buffer.from(data.doc, "base64");
 
+    const url = new URL(request.url);
+    const name = url.searchParams.get("name");
+    const safeName = name && name.trim() ? name.trim() : `document-signe-${id}`;
     return new Response(buffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="document-signe-${id}.pdf"`,
+        "Content-Disposition": `attachment; filename="${safeName}.pdf"`,
         "Cache-Control": "no-store",
       },
     });
