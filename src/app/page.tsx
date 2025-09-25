@@ -168,6 +168,7 @@ export default function Home() {
         "postgres_changes",
         { event: "*", schema: "public", table: "Documents", filter: `id=eq.${dId}` },
         (payload: any) => {
+          console.log("payload", payload);
           try {
             const row = payload?.new ?? payload?.record ?? null;
             const id = row?.id || dId;
