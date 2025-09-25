@@ -116,7 +116,7 @@ export default function Home() {
       if (isMob && dId && !pdfPreviewUrl) {
         setIsFetchingDocument(true);
         setUploaded({ id: dId, url: "" });
-        setPdfPreviewUrl(`/api/document/${dId}`);
+        setPdfPreviewUrl(`/api/document/${dId}?disposition=inline`);
       }
     } catch {}
     // Only run on first load or when preview is empty

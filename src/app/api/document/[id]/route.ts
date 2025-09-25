@@ -27,11 +27,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const url = new URL(request.url);
     const name = url.searchParams.get("name");
+    const disposition = (url.searchParams.get("disposition") || "attachment").toLowerCase() === "inline" ? "inline" : "attachment";
     const safeName = name && name.trim() ? name.trim() : `document-signe-${id}`;
     return new Response(buffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${safeName}.pdf"`,
+        "Content-Disposition": `${disposition}; filename="${safeName}.pdf"`,
         "Cache-Control": "no-store",
       },
     });
