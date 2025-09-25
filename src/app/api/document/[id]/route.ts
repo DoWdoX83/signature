@@ -29,13 +29,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const name = url.searchParams.get("name");
     const disposition = (url.searchParams.get("disposition") || "attachment").toLowerCase() === "inline" ? "inline" : "attachment";
     const safeName = name && name.trim() ? name.trim() : `document-signe-${id}`;
-    return new Response(buffer, {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `${disposition}; filename="${safeName}.pdf"`,
-        "Cache-Control": "no-store",
-      },
-    });
+    const headers: Record<string, string> = {
+      "Content-Type": "application/pdf",
+      "Cache-Control": "no-store",
+    };
+    if (disposition === "attachment") {
+      headers["Content-Disposition"] = `attachment; filename="${safeName}.pdf"`;
+    }
+    return new Response(buffer, { headers });
   } catch (e) {
     console.error("download document error", e);
     return NextResponse.json({ error: "Failed to download" }, { status: 500 });
