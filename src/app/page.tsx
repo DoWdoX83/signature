@@ -60,6 +60,7 @@ export default function Home() {
   const [uploaded, setUploaded] = useState<Uploaded>(null);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isApplyingSignature, setIsApplyingSignature] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
   const sigRef = useRef<SignaturePad | null>(null);
   const sigContainerRef = useRef<HTMLDivElement | null>(null);
@@ -175,6 +176,7 @@ export default function Home() {
       return;
     }
     setError(null);
+    setIsApplyingSignature(true);
     const baseCanvas = (sigRef.current as any).getCanvas
       ? (sigRef.current as any).getCanvas()
       : null;
@@ -210,6 +212,8 @@ export default function Home() {
       }
     } catch (e) {
       setError("Échec de l'enregistrement de la signature");
+    } finally {
+      setIsApplyingSignature(false);
     }
   }, [uploaded, isMobileQuery]);
 
@@ -401,6 +405,20 @@ export default function Home() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Loader upload */}
+      {isUploading && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center">
+          <div className="bg-white rounded-xl px-6 py-4 shadow">Envoi du document...</div>
+        </div>
+      )}
+
+      {/* Loader apposition de signature */}
+      {isApplyingSignature && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center">
+          <div className="bg-white rounded-xl px-6 py-4 shadow">Apposition de la signature...</div>
         </div>
       )}
 

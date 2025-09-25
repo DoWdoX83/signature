@@ -146,6 +146,12 @@ export default function SignPage() {
           {isSaving ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
+
+      {isSaving && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center">
+          <div className="bg-white rounded-xl px-6 py-4 shadow">Sauvegarde en cours...</div>
+        </div>
+      )}
     </div>
   );
 }
