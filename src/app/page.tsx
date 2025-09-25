@@ -61,6 +61,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isApplyingSignature, setIsApplyingSignature] = useState(false);
+  const [isFetchingDocument, setIsFetchingDocument] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
   const sigRef = useRef<SignaturePad | null>(null);
   const sigContainerRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +105,23 @@ export default function Home() {
       setIsMobileQuery(params.get("isMobile") === "true");
     } catch {}
   }, []);
+
+  // Auto-fetch existing document on mobile deep link (?isMobile=true&docId=...)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const isMob = params.get("isMobile") === "true";
+      const dId = params.get("docId");
+      if (isMob && dId && !pdfPreviewUrl) {
+        setIsFetchingDocument(true);
+        setUploaded({ id: dId, url: "" });
+        setPdfPreviewUrl(`/api/document/${dId}`);
+      }
+    } catch {}
+    // Only run on first load or when preview is empty
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobileQuery]);
 
   const [qrUrl, setQrUrl] = useState("");
 
@@ -274,7 +292,11 @@ export default function Home() {
               {pdfPreviewUrl ? (
                 <>
                   <div className="hidden sm:block w-full">
-                    <iframe src={pdfSrc} className="w-full h-[420px] border-0" />
+                    <iframe
+                      src={pdfSrc}
+                      className="w-full h-[420px] border-0"
+                      onLoad={() => setIsFetchingDocument(false)}
+                    />
                   </div>
                   <div className="block sm:hidden w-full text-center p-4">
                     <a
@@ -419,6 +441,13 @@ export default function Home() {
       {isApplyingSignature && (
         <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center">
           <div className="bg-white rounded-xl px-6 py-4 shadow">Apposition de la signature...</div>
+        </div>
+      )}
+
+      {/* Loader récupération de document (deep-link mobile) */}
+      {isFetchingDocument && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center">
+          <div className="bg-white rounded-xl px-6 py-4 shadow">Récupération du document...</div>
         </div>
       )}
 
