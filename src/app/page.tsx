@@ -153,9 +153,9 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    const dId = params.get("docId");
-    const isMob = params.get("isMobile") === "true";
-    if (!dId || isMob) return;
+    const urlDocId = params.get("docId");
+    const effectiveDocId = uploaded?.id || urlDocId;
+    if (!effectiveDocId) return;
 
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
     const SUPABASE_KEY = (process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_ANON_KEY) as string | undefined;
@@ -163,15 +163,15 @@ export default function Home() {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
     const channel = supabase
-      .channel("documents-updates")
+      .channel(`documents-updates-${effectiveDocId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "Documents", filter: `id=eq.${dId}` },
+        { event: "*", schema: "public", table: "Documents", filter: `id=eq.${effectiveDocId}` },
         (payload: any) => {
           console.log("payload", payload);
           try {
             const row = payload?.new ?? payload?.record ?? null;
-            const id = row?.id || dId;
+            const id = row?.id || effectiveDocId;
             // Refresh viewer to latest document
             setUploaded({ id, url: "" });
             setPdfPreviewUrl(`/api/document/${id}?disposition=inline`);
@@ -180,14 +180,12 @@ export default function Home() {
           } catch {}
         }
       )
-      .subscribe((status) => {
-        // no-op; could track status
-      });
+      .subscribe();
 
     return () => {
       try { supabase.removeChannel(channel); } catch {}
     };
-  }, []);
+  }, [uploaded?.id]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
