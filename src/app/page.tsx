@@ -185,6 +185,8 @@ export default function Home() {
     try {
       const params = new URLSearchParams(window.location.search);
       setIsMobileQuery(params.get("isMobile") === "true");
+      const dt = params.get("docType");
+      if (dt) setSelectedDocType(dt);
     } catch {}
   }, []);
 

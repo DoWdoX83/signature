@@ -176,7 +176,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Échec de l'enregistrement du PDF signé" }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, signedBase64 });
+    // Include minimal debug info to help diagnose mobile placement
+    return NextResponse.json({ ok: true, signedBase64, debug: { type: docType, isAxa, offsetX, offsetY, drawW, drawH } });
   } catch (error) {
     console.error("Sign save error", error);
     return NextResponse.json({ error: "Failed to save signature" }, { status: 500 });
