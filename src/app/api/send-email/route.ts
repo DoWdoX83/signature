@@ -6,7 +6,7 @@ import { signedDocumentMail } from "@/mails/signedDocument";
 
 export async function POST(request: Request) {
   try {
-    const { advisor, client, url, docId, name }: { advisor?: string; client?: string; url?: string; docId?: string; name?: string } = await request.json();
+    const { advisor, client, url, docId, name, secondDocBase64, advisorSigPngBase64, docType }: { advisor?: string; client?: string; url?: string; docId?: string; name?: string; secondDocBase64?: string; advisorSigPngBase64?: string; docType?: string } = await request.json();
     if (!advisor || !client || !docId) {
       return NextResponse.json({ error: "Missing advisor or client" }, { status: 400 });
     }
@@ -27,7 +27,22 @@ export async function POST(request: Request) {
     }
 
     const safeName = (name && name.trim()) ? name.trim() : `document-signe-${docId}`;
-    const attachments: Attachment[] = [
+    // 1) Email au client: seulement le document signé principal
+    const clientRes = await sendEmail({
+      to: client,
+      ...signedDocumentMail(),
+      attachments: [
+        {
+          Name: `${safeName}.pdf`,
+          Content: data.doc,
+          ContentType: "application/pdf",
+          ContentID: null,
+        } as unknown as Attachment,
+      ],
+    });
+
+    // 2) Email au conseiller: le document principal + éventuellement le second (AXA)
+    const advisorAttachments: Attachment[] = [
       {
         Name: `${safeName}.pdf`,
         Content: data.doc,
@@ -35,15 +50,68 @@ export async function POST(request: Request) {
         ContentID: null,
       } as unknown as Attachment,
     ];
+    if (secondDocBase64 && secondDocBase64.trim().length > 0) {
+      try {
+        // Stamp advisor signature and date into the second doc (server-side)
+        const { PDFDocument, rgb, StandardFonts } = await import("pdf-lib");
+        const secondBytes = Buffer.from(secondDocBase64, "base64");
+        const pdfDoc = await PDFDocument.load(secondBytes);
+        const pages = pdfDoc.getPages();
+        const page = pages[pages.length - 1];
+        if (!page) throw new Error("No page");
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const now = new Date();
+        const dd = String(now.getDate()).padStart(2, "0");
+        const mm = String(now.getMonth() + 1).padStart(2, "0");
+        const yyyy = String(now.getFullYear());
+        const dateStr = `${dd}.${mm}.${yyyy}`;
+        let dateY = 408;
+        if (docType?.includes("3A") && docType?.toLowerCase().includes("ok") && !docType?.toLowerCase().includes("non ok")) {
+          dateY = 400;
+        } else if (docType?.includes("3B") && docType?.toLowerCase().includes("ok")) {
+          dateY = 185;
+        } else if (docType?.includes("3B") && docType?.toLowerCase().includes("non ok")) {
+          dateY = 110; // doc 2: 160 - 50
+        } else if (!(docType?.includes("Axa"))) {
+          dateY = 423;
+        }
+        page.drawText(dateStr, { x: 240, y: dateY, size: 12, font, color: rgb(0,0,0) });
+        if (advisorSigPngBase64 && advisorSigPngBase64.trim()) {
+          let img;
+          try { img = await pdfDoc.embedPng(Buffer.from(advisorSigPngBase64, "base64")); } catch { img = await pdfDoc.embedJpg(Buffer.from(advisorSigPngBase64, "base64")); }
+          let sigX = 350, sigY = 408;
+          if (docType?.includes("3A") && docType?.toLowerCase().includes("ok") && !docType?.toLowerCase().includes("non ok")) { sigX = 400; sigY = 400; }
+          else if (docType?.includes("3B") && docType?.toLowerCase().includes("ok")) { sigX = 350; sigY = 185; }
+          else if (docType?.includes("3B") && docType?.toLowerCase().includes("non ok")) { sigX = 400; sigY = 110; }
+          page.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.15, height: img.height * 0.15, opacity: 1 });
+        }
+        const stamped = await pdfDoc.save();
+        const stampedB64 = Buffer.from(stamped).toString("base64");
+        advisorAttachments.push({
+          Name: `${safeName}-annexe.pdf`,
+          Content: stampedB64,
+          ContentType: "application/pdf",
+          ContentID: null,
+        } as unknown as Attachment);
+      } catch {
+        // Fallback to raw second doc if stamping fails
+        advisorAttachments.push({
+          Name: `${safeName}-annexe.pdf`,
+          Content: secondDocBase64,
+          ContentType: "application/pdf",
+          ContentID: null,
+        } as unknown as Attachment);
+      }
+    }
 
-    const res = await sendEmail({
-      to: client,
-      cc: [advisor],
+    const advisorRes = await sendEmail({
+      to: advisor,
       ...signedDocumentMail(),
-      attachments,
+      attachments: advisorAttachments,
     });
 
-    console.log("RES EMAIL SENT: ", res);
+    console.log("RES EMAIL SENT (client): ", clientRes);
+    console.log("RES EMAIL SENT (advisor): ", advisorRes);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

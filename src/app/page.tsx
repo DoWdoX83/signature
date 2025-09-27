@@ -57,6 +57,80 @@ function trimTransparentPixels(sourceCanvas: HTMLCanvasElement): HTMLCanvasEleme
   return trimmedCanvas;
 }
 
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  try {
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(chunk) as any);
+    }
+    return typeof btoa === "function" ? btoa(binary) : "";
+  } catch {
+    try {
+      // Fallback when Buffer is available (SSR or polyfill)
+      return (Buffer as any)?.from?.(bytes)?.toString?.("base64") ?? "";
+    } catch {
+      return "";
+    }
+  }
+}
+
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = typeof atob === "function" ? atob(base64) : "";
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+  return bytes;
+}
+
+function formatToday(): string {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const yyyy = String(now.getFullYear());
+  return `${dd}.${mm}.${yyyy}`;
+}
+
+async function buildAxaSecondWithAdvisor(base64: string, advisorSigRef: React.MutableRefObject<SignaturePad | null>, docType: string): Promise<Uint8Array> {
+  const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+  const secondBytes = base64ToUint8Array(base64);
+  const secondDoc = await PDFDocument.load(secondBytes);
+  const pages2 = secondDoc.getPages();
+  const last2 = pages2.length > 0 ? pages2[pages2.length - 1] : undefined;
+  if (!last2) throw new Error("Second PDF has no pages");
+  const font = await secondDoc.embedFont(StandardFonts.Helvetica);
+  const dateStr = formatToday();
+  // y coordinate varies based on selectedDocType
+  let dateY = 423;
+  if (docType.includes("3A") && docType.toLowerCase().includes("ok") && !docType.toLowerCase().includes("non ok")) {
+    dateY = 425; // align to signature Y below (415 for doc 2)
+  } else if (docType.includes("3B") && docType.toLowerCase().includes("non ok")) {
+    dateY = 140;
+  } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
+    dateY = 140;
+  }
+  last2.drawText(dateStr, { x: 240, y: dateY, size: 12, font, color: rgb(0,0,0) });
+  if (advisorSigRef.current && !(advisorSigRef.current as any).isEmpty()) {
+    const sigDataUrl = (advisorSigRef.current as any).toDataURL("image/png");
+    const imgBase64 = sigDataUrl.split(",")[1] || sigDataUrl;
+    let img;
+    try { img = await secondDoc.embedPng(base64ToUint8Array(imgBase64)); } catch { img = await secondDoc.embedJpg(base64ToUint8Array(imgBase64)); }
+    // signature X/Y vary with type
+    let sigX = 350; let sigY = 423;
+    if (docType.includes("3A") && docType.toLowerCase().includes("ok") && !docType.toLowerCase().includes("non ok")) {
+      sigX = 350; sigY = 415; // 350,415
+    } else if (docType.includes("3B") && docType.toLowerCase().includes("non ok")) {
+      sigX = 350; sigY = 135;
+    } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
+      sigX = 350; sigY = 135; // 350,200
+    }
+    last2.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.15, height: img.height * 0.15, opacity: 1 });
+  }
+  const final = await secondDoc.save();
+  return final;
+}
+
 export default function Home() {
   const [uploaded, setUploaded] = useState<Uploaded>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,10 +139,17 @@ export default function Home() {
   const [isFetchingDocument, setIsFetchingDocument] = useState(false);
   const [isQrOpen, setIsQrOpen] = useState(false);
   const sigRef = useRef<SignaturePad | null>(null);
+  const advisorSigRef = useRef<SignaturePad | null>(null);
   const sigContainerRef = useRef<HTMLDivElement | null>(null);
   const [showHint, setShowHint] = useState(true);
   const [isSigModalOpen, setIsSigModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState<string>("");
+  const [secondFile, setSecondFile] = useState<File | null>(null);
+  const [axaSecondDocBase64, setAxaSecondDocBase64] = useState<string | null>(null);
   const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(null);
+  const [advisorSigned, setAdvisorSigned] = useState(false);
   const [advisorEmail, setAdvisorEmail] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [documentName, setDocumentName] = useState("");
@@ -152,6 +233,7 @@ export default function Home() {
   // Realtime when visiting desktop with a docId present (watch for new/updated doc)
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (isMobileQuery) return; // ne pas écouter en mode mobile
     const params = new URLSearchParams(window.location.search);
     const urlDocId = params.get("docId");
     const effectiveDocId = uploaded?.id || urlDocId;
@@ -174,7 +256,9 @@ export default function Home() {
             const id = row?.id || effectiveDocId;
             // Refresh viewer to latest document
             setUploaded({ id, url: "" });
-            setPdfPreviewUrl(`/api/document/${id}?disposition=inline`);
+            const latestUrl = `/api/document/${id}?disposition=inline`;
+            setPdfPreviewUrl(latestUrl);
+            setSignedPdfUrl(latestUrl);
             // Open modal to let user download/send
             setIsSigModalOpen(true);
           } catch {}
@@ -185,8 +269,9 @@ export default function Home() {
     return () => {
       try { supabase.removeChannel(channel); } catch {}
     };
-  }, [uploaded?.id]);
+  }, [uploaded?.id, isMobileQuery]);
 
+  const [baseFile, setBaseFile] = useState<File | null>(null);
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
@@ -195,29 +280,15 @@ export default function Home() {
       return;
     }
     setError(null);
-    setIsUploading(true);
-    try {
-      // Local blob for preview (desktop iframe and mobile link)
-      try { if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl); } catch {}
-      const objectUrl = URL.createObjectURL(file);
-      setPdfPreviewUrl(objectUrl);
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: form });
-      if (!res.ok) throw new Error("Upload error");
-      const json = (await res.json()) as { id: string };
-      setUploaded({ id: json.id, url: "" });
-      const url = new URL(window.location.href);
-      url.searchParams.set("docId", json.id);
-      const href = url.toString();
-      window.history.replaceState(null, "", href);
-      setQrUrl(href);
-    } catch (e) {
-      setError("Échec de l'upload");
-    } finally {
-      setIsUploading(false);
-    }
-  }, [pdfPreviewUrl]);
+    // Ne pas uploader ni pré-visualiser immédiatement
+    try { if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl); } catch {}
+    setPdfPreviewUrl("");
+    setBaseFile(file);
+    setSelectedDocType("");
+    setSecondFile(null);
+    setAxaSecondDocBase64(null);
+    setIsTypeModalOpen(true);
+  }, [pdfPreviewUrl, isMobileQuery]);
 
   const handleClear = useCallback(() => {
     sigRef.current?.clear();
@@ -260,12 +331,14 @@ export default function Home() {
       const res = await fetch("/api/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: uploaded.id, signatureDataUrl: dataUrl }),
+        body: JSON.stringify({ id: uploaded.id, signatureDataUrl: dataUrl, docType: selectedDocType }),
       });
       if (!res.ok) throw new Error("Sign error");
-      setSignedPdfUrl(null);
+      setSignedPdfUrl(`/api/document/${uploaded.id}?disposition=inline`);
       if (!isMobileQuery) {
         setIsSigModalOpen(true);
+      } else {
+        setIsSuccessModalOpen(true);
       }
     } catch (e) {
       setError("Échec de l'enregistrement de la signature");
@@ -274,18 +347,84 @@ export default function Home() {
     }
   }, [uploaded, isMobileQuery]);
 
-  const canSend = advisorEmail.trim().length > 0 && clientEmail.trim().length > 0;
+  const isDocNameValid = documentName.trim().length > 0;
+  const isAxaSelected = selectedDocType.startsWith("Axa");
+  const canSend = advisorEmail.trim().length > 0 && clientEmail.trim().length > 0 && isDocNameValid && (!isAxaSelected || advisorSigned);
+  const canDownload = isDocNameValid && (!isAxaSelected || advisorSigned) && !!uploaded?.id;
+
+  // Fusion côté client si un second PDF est fourni (cas AXA)
+  const handleValidateTypeModal = useCallback(async () => {
+    try {
+      if (!baseFile) {
+        setError("Aucun document de base");
+        return;
+      }
+      setIsUploading(true);
+      let finalBytes: Uint8Array | null = null;
+      const setNameFromType = () => {
+        if (selectedDocType) setDocumentName(selectedDocType);
+      };
+      const isAxa = selectedDocType.startsWith("Axa");
+      // Toujours uploader le premier document seulement
+      const baseArray = await baseFile.arrayBuffer();
+      finalBytes = new Uint8Array(baseArray);
+      // Si AXA et un 2e fichier est fourni, le conserver seulement en mémoire (base64)
+      if (isAxa) {
+        if (!secondFile) {
+          setError("Merci d'ajouter le 2e PDF pour les documents AXA");
+          setIsUploading(false);
+          return;
+        }
+        const secondArray = await secondFile.arrayBuffer();
+        const b64 = uint8ArrayToBase64(new Uint8Array(secondArray));
+        setAxaSecondDocBase64(b64);
+      } else {
+        setAxaSecondDocBase64(null);
+      }
+
+      // Upload du document (fusionné ou simple)
+      const finalArrayBuffer = finalBytes!.buffer.slice(finalBytes!.byteOffset, finalBytes!.byteOffset + finalBytes!.byteLength) as ArrayBuffer;
+      const finalBlob = new Blob([new Uint8Array(finalArrayBuffer)], { type: "application/pdf" });
+      const finalFile = new File([finalBlob], "document.pdf", { type: "application/pdf" });
+      const form = new FormData();
+      form.append("file", finalFile);
+      const res = await fetch("/api/upload", { method: "POST", body: form });
+      if (!res.ok) throw new Error("Upload error");
+      const json = (await res.json()) as { id: string };
+      setUploaded({ id: json.id, url: "" });
+      const url = new URL(window.location.href);
+      url.searchParams.set("docId", json.id);
+      const href = url.toString();
+      window.history.replaceState(null, "", href);
+      setQrUrl(href);
+      setPdfPreviewUrl(`/api/document/${json.id}?disposition=inline`);
+      setNameFromType();
+      setIsTypeModalOpen(false);
+      setSecondFile(null);
+      setBaseFile(null);
+      // Ne pas ouvrir la modale d'envoi ici; elle s'ouvrira après signature
+    } catch (e) {
+      setError("Échec de la préparation du document");
+    } finally {
+      setIsUploading(false);
+    }
+  }, [secondFile, selectedDocType, baseFile]);
   const handleSendEmails = useCallback(async () => {
     if (!canSend) return;
     try {
+      let advisorSigPngBase64: string | undefined = undefined;
+      if (isAxaSelected && advisorSigRef.current && !(advisorSigRef.current as any).isEmpty()) {
+        const sigDataUrl = (advisorSigRef.current as any).toDataURL("image/png");
+        advisorSigPngBase64 = sigDataUrl.split(",")[1] || sigDataUrl;
+      }
       await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ advisor: advisorEmail.trim(), client: clientEmail.trim(), url: qrUrl, docId: uploaded?.id, name: documentName.trim() || undefined }),
+        body: JSON.stringify({ advisor: advisorEmail.trim(), client: clientEmail.trim(), url: qrUrl, docId: uploaded?.id, name: documentName.trim() || undefined, secondDocBase64: axaSecondDocBase64 || undefined, advisorSigPngBase64, docType: selectedDocType }),
       });
       setIsSigModalOpen(false);
     } catch {}
-  }, [advisorEmail, clientEmail, canSend, qrUrl, uploaded?.id]);
+  }, [advisorEmail, clientEmail, canSend, qrUrl, uploaded?.id, axaSecondDocBase64]);
 
   return (
     <div>
@@ -363,23 +502,25 @@ export default function Home() {
           {/* Signature */}
           <div className="sm:w-1/2 w-full">
             <div className="text-gray-800 font-semibold">Signature</div>
-            <div ref={sigContainerRef} className="relative border border-[var(--border-subtle)] rounded-xl bg-white h-[150px] sm:h-[420px] overflow-hidden">
-              {showHint && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                  <svg width="60%" height="60" viewBox="0 0 300 60">
-                    <path d="M5 40 C 40 10, 80 60, 120 30 S 200 40, 295 20" fill="none" stroke="#000" strokeWidth="3" style={{ animation: "stroke 2.6s ease-in-out infinite" }} />
-                  </svg>
-                </div>
-              )}
-              <SignaturePad
-                ref={(r) => { sigRef.current = r as any; }}
-                onBegin={() => setShowHint(false)}
-                canvasProps={{
-                  style: { width: "100%", height: "100%", position: "absolute", inset: 0, display: "block", touchAction: "none" },
-                }}
-                penColor="#000"
-                backgroundColor="#fff"
-              />
+            <div className="relative border border-[var(--border-subtle)] rounded-xl bg-white h-[150px] sm:h-[260px] overflow-hidden flex items-center justify-center p-4">
+              <div ref={sigContainerRef} className="relative w-[92%] h-[120px] sm:w-[80%] sm:h-[180px] bg-[#f0f5f8] rounded-2xl">
+                {showHint && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                    <svg width="60%" height="60" viewBox="0 0 300 60">
+                      <path d="M5 40 C 40 10, 80 60, 120 30 S 200 40, 295 20" fill="none" stroke="#000" strokeWidth="3" style={{ animation: "stroke 2.6s ease-in-out infinite" }} />
+                    </svg>
+                  </div>
+                )}
+                <SignaturePad
+                  ref={(r) => { sigRef.current = r as any; }}
+                  onBegin={() => setShowHint(false)}
+                  canvasProps={{
+                    style: { width: "100%", height: "100%", position: "absolute", inset: 0, display: "block", touchAction: "none" },
+                  }}
+                  penColor="#000"
+                  backgroundColor="rgba(0,0,0,0)"
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-3 pt-2 h-[50px]">
               <button onClick={() => { handleClear(); setShowHint(true); }} className="bg-white border border-[var(--border-subtle)] rounded-xl px-4 py-2 cursor-pointer">Effacer</button>
@@ -387,6 +528,7 @@ export default function Home() {
             </div>
           </div>
         </div>
+        
       </div>
 
       {uploaded && signUrl && (
@@ -398,6 +540,19 @@ export default function Home() {
         >
           <QRCodeCanvas value={signUrl} size={40} />
         </button>
+      )}
+
+      {/* Bouton flottant pour ouvrir le document signé */}
+      {signedPdfUrl && (
+        <a
+          href={signedPdfUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed right-4 bottom-24 rounded-xl border border-[var(--border-subtle)] bg-white px-3.5 py-2.5 shadow z-50"
+          style={{ marginRight: "env(safe-area-inset-right)" }}
+        >
+          Ouvrir le document signé
+        </a>
       )}
 
       {isQrOpen && signUrl && (
@@ -419,7 +574,7 @@ export default function Home() {
           <div onClick={(e) => e.stopPropagation()} className="bg-white p-6 rounded-2xl max-w-[90vw] w-[560px] text-left">
             <h3 className="text-center">Envoyer le document par email</h3>
             <div className="mt-5">
-              <label className="block text-sm text-[#495057] mb-1">Nom du document (optionnel)</label>
+              <label className="block text-sm text-[#495057] mb-1">Nom du document (obligatoire)</label>
               <input
                 type="text"
                 value={documentName}
@@ -428,6 +583,32 @@ export default function Home() {
                 className="w-full border border-[var(--border-subtle)] rounded-xl px-3.5 py-2.5 outline-none"
               />
             </div>
+            {isAxaSelected && (
+              <div className="mt-4">
+                <div className="text-sm text-[#495057] mb-1">Signature conseiller (obligatoire)</div>
+                <div className="relative border border-[var(--border-subtle)] rounded-xl bg-white h-[140px] overflow-hidden flex items-center justify-center p-3">
+                  <div className="relative w-full h-full bg-[#f0f5f8] rounded-xl">
+                    <SignaturePad
+                      ref={(r) => { advisorSigRef.current = r as any; }}
+                      onBegin={() => setAdvisorSigned(true)}
+                      canvasProps={{
+                        style: { width: "100%", height: "100%", position: "absolute", inset: 0, display: "block", touchAction: "none" },
+                      }}
+                      penColor="#000"
+                      backgroundColor="rgba(0,0,0,0)"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 flex justify-end">
+                  <button
+                    onClick={() => { advisorSigRef.current?.clear(); setAdvisorSigned(false); }}
+                    className="bg-white border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 cursor-pointer"
+                  >
+                    Effacer
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="mt-4">
               <label className="block text-sm text-[#495057] mb-1">Email conseiller</label>
               <input
@@ -450,8 +631,38 @@ export default function Home() {
             </div>
             <div className="mt-6 flex justify-center gap-3">
               <a
-                href={uploaded?.id ? (`/api/document/${uploaded.id}` + (documentName.trim() ? `?name=${encodeURIComponent(documentName.trim())}` : "")) : "#"}
-                className="rounded-xl px-4 py-2 border border-[var(--border-subtle)] cursor-pointer"
+                href={canDownload ? (`/api/document/${uploaded!.id}` + (documentName.trim() ? `?name=${encodeURIComponent(documentName.trim())}` : "")) : undefined}
+                className={`rounded-xl px-4 py-2 border border-[var(--border-subtle)] ${!canDownload ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                onClick={async (e) => {
+                  if (!canDownload) { e.preventDefault(); return; }
+                  if (isAxaSelected && axaSecondDocBase64 && advisorSigned) {
+                    e.preventDefault();
+                    try {
+                      const signedMain = await fetch(`/api/document/${uploaded!.id}`);
+                      const mainBytes = new Uint8Array(await signedMain.arrayBuffer());
+                      const secondFinal = await buildAxaSecondWithAdvisor(axaSecondDocBase64, advisorSigRef, selectedDocType);
+
+                      // Download both files
+                      const download = (data: Uint8Array, name: string) => {
+                        const ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+                        const blob = new Blob([new Uint8Array(ab)], { type: "application/pdf" });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = name;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                      };
+                      download(mainBytes, `${documentName.trim() || "document"}.pdf`);
+                      download(secondFinal, `${(documentName.trim() || "document")}-annexe.pdf`);
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }
+                }}
+                aria-disabled={!canDownload}
                 download
               >
                 Télécharger
@@ -487,6 +698,72 @@ export default function Home() {
       {isFetchingDocument && (
         <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center">
           <div className="bg-white rounded-xl px-6 py-4 shadow">Récupération du document...</div>
+        </div>
+      )}
+
+      {/* Modale succès (mobile) */}
+      {isSuccessModalOpen && (
+        <div onClick={() => setIsSuccessModalOpen(false)} className="fixed inset-0 z-[85] bg-black/50 flex items-center justify-center">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl p-6 text-center w-[85vw] max-w-[360px]">
+            <div className="mx-auto mb-3 h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+            <div className="font-semibold">Signature enregistrée</div>
+            <div className="mt-1 text-sm text-[#495057]">Votre signature a été apposée avec succès.</div>
+            <div className="mt-4">
+              <button onClick={() => setIsSuccessModalOpen(false)} className="border border-[var(--border-subtle)] rounded-xl px-4 py-2">Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale type de document + option deuxième PDF */}
+      {isTypeModalOpen && (
+        <div onClick={() => setIsTypeModalOpen(false)} className="fixed inset-0 z-[75] bg-black/50 flex items-center justify-center">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white p-6 rounded-2xl max-w-[92vw] w-[560px]">
+            <h3 className="text-center">Type de document</h3>
+            <div className="mt-5">
+              <label className="block text-sm text-[#495057] mb-1">Sélectionner un type</label>
+              <select
+                value={selectedDocType}
+                onChange={(e) => setSelectedDocType(e.target.value)}
+                className="w-full border border-[var(--border-subtle)] rounded-xl px-3.5 py-2.5 outline-none bg-white"
+              >
+                <option value="">Choisir…</option>
+                <option>Article 45</option>
+                <option>Mandat de gestion</option>
+                <option>DORIAN</option>
+                <option>Axa 3A - profil de risque ok</option>
+                <option>Axa 3A - profil de risque non ok</option>
+                <option>Axa 3B - profil de risque ok</option>
+                <option>Axa 3B - profil de risque non ok</option>
+              </select>
+            </div>
+            {(selectedDocType.startsWith("Axa")) && (
+              <div className="mt-4">
+                <label className="block text-sm text-[#495057] mb-1">Ajouter le 2e PDF (AXA)</label>
+                <Dropzone onDrop={(files) => setSecondFile(files?.[0] ?? null)} multiple={false} accept={{ "application/pdf": [".pdf"] }}>
+                  {({ getRootProps, getInputProps, isDragActive }) => (
+                    <div
+                      {...getRootProps()}
+                      className="bg-[var(--green-light)] rounded-xl h-14 cursor-pointer border border-green-200 border-dashed flex items-center justify-center"
+                    >
+                      <input {...getInputProps()} />
+                      <div className="text-[#2d4c46] text-sm">
+                        {secondFile ? secondFile.name : (isDragActive ? "Déposez le 2e PDF ici" : "Drag & drop ou choisir le 2e PDF")}
+                      </div>
+                    </div>
+                  )}
+                </Dropzone>
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setIsTypeModalOpen(false)} className="border border-[var(--border-subtle)] rounded-xl px-3.5 py-2.5">Annuler</button>
+              <button onClick={handleValidateTypeModal} className="rounded-xl px-4 py-2 font-semibold text-white" style={{ background: 'var(--brand-green)' }}>Valider</button>
+            </div>
+          </div>
         </div>
       )}
 
