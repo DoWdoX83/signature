@@ -468,7 +468,7 @@ export default function Home() {
         <div className="sm:flex gap-4">
           <div className="w-full sm:w-1/2">
             <div className="text-gray-800 font-semibold">Document</div>
-            <div className="border border-[var(--border-subtle)] rounded-xl max-h-[350px] min-h-[350px] sm:min-h-[420px] sm:max-h-[420px] overflow-hidden bg-white flex items-center justify-center">
+            <div className="border border-[var(--border-subtle)] rounded-xl max-h-[200px] min-h-[200px] sm:min-h-[420px] sm:max-h-[420px] overflow-hidden bg-white flex items-center justify-center">
               {pdfPreviewUrl ? (
                 <>
                   <div className="hidden sm:block w-full">

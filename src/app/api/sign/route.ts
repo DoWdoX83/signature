@@ -89,22 +89,26 @@ export async function POST(request: Request) {
     let offsetX: number;
     let offsetY: number;
     if (isAxa) {
-      // AXA: coordinates depend on subtype
-      drawW = image.width * 0.15;
-      drawH = image.height * 0.15;
+      // AXA: fix image width for consistency across devices
       const type = String(docType || "");
-      if (type.includes("3A") && type.toLowerCase().includes("non ok")) {
+      const lower = type.toLowerCase();
+      const is3a = lower.includes("3a");
+      const is3b = lower.includes("3b");
+      const isNonOk = lower.includes("non ok");
+      const isOk = lower.includes("ok") && !isNonOk;
+      const targetWidth = 180; // points
+      drawW = targetWidth;
+      drawH = (image.height / image.width) * targetWidth;
+
+      if (is3a && isNonOk) {
         offsetX = 380; offsetY = 423;
-      } else if (type.includes("3A") && type.toLowerCase().includes("ok")) {
+      } else if (is3a && isOk) {
         offsetX = 400; offsetY = 465;
-      } else if (type.includes("3B") && type.toLowerCase().includes("non ok")) {
-        // Ajuste: déplacer davantage à droite et remonter
-        offsetX = 400; offsetY = 180;
-      } else if (type.includes("3B") && type.toLowerCase().includes("ok")) {
-        // Descendre Y de 50 pour doc 1 (3B respecté)
-        offsetX = 400; offsetY = 220;
+      } else if (is3b && isNonOk) {
+        offsetX = 480; offsetY = 20;
+      } else if (is3b && isOk) {
+        offsetX = 350; offsetY = 150;
       } else {
-        // fallback to non ok 3A
         offsetX = 380; offsetY = 423;
       }
     } else {
@@ -135,13 +139,18 @@ export async function POST(request: Request) {
         const yyyy = String(now.getFullYear());
         const dateStr = `${dd}.${mm}.${yyyy}`;
         const type = String(docType || "");
+        const lower = type.toLowerCase();
+        const is3a = lower.includes("3a");
+        const is3b = lower.includes("3b");
+        const isNonOk = lower.includes("non ok");
+        const isOk = lower.includes("ok") && !isNonOk;
         let dateY = 423;
-        if (type.includes("3A") && type.toLowerCase().includes("ok") && !type.toLowerCase().includes("non ok")) {
-          dateY = 465; // aligne la date sur le Y de la signature doc 1
-        } else if (type.includes("3B") && type.toLowerCase().includes("ok") && !type.toLowerCase().includes("non ok")) {
-          dateY = 220;
-        } else if (type.includes("3B") && type.toLowerCase().includes("non ok")) {
-          dateY = 180;
+        if (is3a && isOk) {
+          dateY = 465;
+        } else if (is3b && isNonOk) {
+          dateY = 200;
+        } else if (is3b && isOk) {
+          dateY = 150;
         }
         targetPage.drawText(dateStr, {
           x: 240,
@@ -150,7 +159,7 @@ export async function POST(request: Request) {
           font,
           color: rgb(0, 0, 0),
         });
-        console.log(`[axa-sign] type=${type} placed sign=(${offsetX},${offsetY}) dateY=${dateY}`);
+        console.log(`[axa-sign] type=${type} placed sign=(${offsetX},${offsetY}) size=(${drawW}x${drawH}) dateY=${dateY}`);
       } catch {}
     }
     try { form.flatten(); } catch {}
