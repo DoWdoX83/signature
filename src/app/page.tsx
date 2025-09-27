@@ -212,11 +212,13 @@ export default function Home() {
     try {
       const u = new URL(qrUrl);
       u.searchParams.set("isMobile", "true");
+      if (selectedDocType) u.searchParams.set("docType", selectedDocType);
       return u.toString();
     } catch {
-      return qrUrl + (qrUrl.includes("?") ? "&" : "?") + "isMobile=true";
+      const base = qrUrl + (qrUrl.includes("?") ? "&" : "?") + "isMobile=true";
+      return selectedDocType ? base + `&docType=${encodeURIComponent(selectedDocType)}` : base;
     }
-  }, [qrUrl]);
+  }, [qrUrl, selectedDocType]);
   const pdfSrc = useMemo(() => {
     if (!pdfPreviewUrl) return "";
     return `${pdfPreviewUrl}#view=FitH&toolbar=0&navpanes=0&statusbar=0&zoom=page-width`;
