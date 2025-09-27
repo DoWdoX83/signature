@@ -61,6 +61,7 @@ export default function SignPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [docType, setDocType] = useState<string>("");
   
   useEffect(() => {
     const el = containerRef.current;
@@ -71,6 +72,14 @@ export default function SignPage() {
     });
     ro.observe(el);
     return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const t = params.get("docType") || "";
+      setDocType(t);
+    } catch {}
   }, []);
 
   const handleClear = useCallback(() => {
@@ -110,7 +119,7 @@ export default function SignPage() {
       const res = await fetch("/api/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, signatureDataUrl: dataUrl }),
+        body: JSON.stringify({ id, signatureDataUrl: dataUrl, docType }),
       });
       if (!res.ok) throw new Error("Erreur");
       const json = await res.json();
