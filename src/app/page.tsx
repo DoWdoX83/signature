@@ -734,7 +734,10 @@ export default function Home() {
                 <option value="">Choisir…</option>
                 <option>Article 45</option>
                 <option>Mandat de gestion</option>
-                <option>DORIAN</option>
+                <option>Lettre libération des primes</option>
+                <option>Lettre résiliation Lamal / LCA</option>
+                <option>Procuration Centrale 2e pilier</option>
+                <option>Demande caisses de pension</option>
                 <option>Axa 3A - profil de risque ok</option>
                 <option>Axa 3A - profil de risque non ok</option>
                 <option>Axa 3B - profil de risque ok</option>
