@@ -9,9 +9,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing id or signature" }, { status: 400 });
     }
 
-    const ua = request.headers.get("user-agent") || "";
-    const isLikelyMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
-
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!SUPABASE_URL || !SUPABASE_KEY) {
@@ -92,26 +89,22 @@ export async function POST(request: Request) {
     let offsetX: number;
     let offsetY: number;
     if (isAxa) {
-      // AXA: fix image width for consistency across devices
+      // AXA: coordinates depend on subtype
+      drawW = image.width * 0.15;
+      drawH = image.height * 0.15;
       const type = String(docType || "");
-      const lower = type.toLowerCase();
-      const is3a = lower.includes("3a");
-      const is3b = lower.includes("3b");
-      const isNonOk = lower.includes("non ok");
-      const isOk = lower.includes("ok") && !isNonOk;
-      const targetWidth = isLikelyMobile ? 120 : 180; // points
-      drawW = targetWidth;
-      drawH = (image.height / image.width) * targetWidth;
-
-      if (is3a && isNonOk) {
-        offsetX = 380; offsetY = 423;
-      } else if (is3a && isOk) {
+      if (type.includes("3A") && type.toLowerCase().includes("non ok")) {
+        offsetX = 400; offsetY = 423;
+      } else if (type.includes("3A") && type.toLowerCase().includes("ok")) {
         offsetX = 400; offsetY = 465;
-      } else if (is3b && isNonOk) {
-        offsetX = 480; offsetY = 20;
-      } else if (is3b && isOk) {
-        offsetX = 350; offsetY = 150;
+      } else if (type.includes("3B") && type.toLowerCase().includes("non ok")) {
+        // Ajuste: déplacer davantage à droite et remonter
+        offsetX = 400; offsetY = 180;
+      } else if (type.includes("3B") && type.toLowerCase().includes("ok")) {
+        // Descendre Y de 50 pour doc 1 (3B respecté)
+        offsetX = 400; offsetY = 220;
       } else {
+        // fallback to non ok 3A
         offsetX = 380; offsetY = 423;
       }
     } else {
@@ -142,18 +135,13 @@ export async function POST(request: Request) {
         const yyyy = String(now.getFullYear());
         const dateStr = `${dd}.${mm}.${yyyy}`;
         const type = String(docType || "");
-        const lower = type.toLowerCase();
-        const is3a = lower.includes("3a");
-        const is3b = lower.includes("3b");
-        const isNonOk = lower.includes("non ok");
-        const isOk = lower.includes("ok") && !isNonOk;
         let dateY = 423;
-        if (is3a && isOk) {
-          dateY = 465;
-        } else if (is3b && isNonOk) {
-          dateY = 200;
-        } else if (is3b && isOk) {
-          dateY = 150;
+        if (type.includes("3A") && type.toLowerCase().includes("ok") && !type.toLowerCase().includes("non ok")) {
+          dateY = 465; // aligne la date sur le Y de la signature doc 1
+        } else if (type.includes("3B") && type.toLowerCase().includes("ok") && !type.toLowerCase().includes("non ok")) {
+          dateY = 220;
+        } else if (type.includes("3B") && type.toLowerCase().includes("non ok")) {
+          dateY = 180;
         }
         targetPage.drawText(dateStr, {
           x: 240,
@@ -162,7 +150,7 @@ export async function POST(request: Request) {
           font,
           color: rgb(0, 0, 0),
         });
-        console.log(`[axa-sign] type=${type} placed sign=(${offsetX},${offsetY}) size=(${drawW}x${drawH}) dateY=${dateY}`);
+        console.log(`[axa-sign] type=${type} placed sign=(${offsetX},${offsetY}) dateY=${dateY}`);
       } catch {}
     }
     try { form.flatten(); } catch {}
@@ -179,8 +167,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Échec de l'enregistrement du PDF signé" }, { status: 500 });
     }
 
-    // Include minimal debug info to help diagnose mobile placement
-    return NextResponse.json({ ok: true, signedBase64, debug: { type: docType, isAxa, offsetX, offsetY, drawW, drawH } });
+    return NextResponse.json({ ok: true, signedBase64 });
   } catch (error) {
     console.error("Sign save error", error);
     return NextResponse.json({ error: "Failed to save signature" }, { status: 500 });
