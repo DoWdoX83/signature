@@ -9,6 +9,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing id or signature" }, { status: 400 });
     }
 
+    const ua = request.headers.get("user-agent") || "";
+    const isLikelyMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!SUPABASE_URL || !SUPABASE_KEY) {
@@ -96,7 +99,7 @@ export async function POST(request: Request) {
       const is3b = lower.includes("3b");
       const isNonOk = lower.includes("non ok");
       const isOk = lower.includes("ok") && !isNonOk;
-      const targetWidth = 180; // points
+      const targetWidth = isLikelyMobile ? 120 : 180; // points
       drawW = targetWidth;
       drawH = (image.height / image.width) * targetWidth;
 
