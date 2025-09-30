@@ -1,6 +1,6 @@
 {
   "/api/upload/route": "app/api/upload/route.js",
-  "/api/document/[id]/route": "app/api/document/[id]/route.js",
   "/api/sign/route": "app/api/sign/route.js",
+  "/api/document/[id]/route": "app/api/document/[id]/route.js",
   "/page": "app/page.js"
 }

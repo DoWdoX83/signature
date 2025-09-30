@@ -750,7 +750,7 @@ export default function Home() {
             </div>
             {(selectedDocType.startsWith("Axa")) && (
               <div className="mt-4">
-                <label className="block text-sm text-[#495057] mb-1">Ajouter le 2e PDF (AXA)</label>
+                <label className="block text-sm text-[#495057] mb-1">Ajouter le 2e PDF (AXA pour signature conseiller)</label>
                 <Dropzone onDrop={(files) => setSecondFile(files?.[0] ?? null)} multiple={false} accept={{ "application/pdf": [".pdf"] }}>
                   {({ getRootProps, getInputProps, isDragActive }) => (
                     <div
