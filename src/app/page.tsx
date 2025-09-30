@@ -106,7 +106,7 @@ async function buildAxaSecondWithAdvisor(base64: string, advisorSigRef: React.Mu
   if (docType.includes("3A") && docType.toLowerCase().includes("ok") && !docType.toLowerCase().includes("non ok")) {
     dateY = 425; // align to signature Y below (415 for doc 2)
   } else if (docType.includes("3B") && docType.toLowerCase().includes("non ok")) {
-    dateY = 110;
+    dateY = 140;
   } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
     dateY = 135;
   }
@@ -121,7 +121,7 @@ async function buildAxaSecondWithAdvisor(base64: string, advisorSigRef: React.Mu
     if (docType.includes("3A") && docType.toLowerCase().includes("ok") && !docType.toLowerCase().includes("non ok")) {
       sigX = 375; sigY = 415; // 350,415
     } else if (docType.includes("3B") && docType.toLowerCase().includes("non ok")) {
-      sigX = 375; sigY = 110;
+      sigX = 375; sigY = 135;
     } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
       sigX = 375; sigY = 135; // 350,200
     }
