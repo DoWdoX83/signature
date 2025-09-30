@@ -144,7 +144,7 @@ export default function SignPage() {
           canvasProps={{
             style: { width: "100%", height: "100%", position: "absolute", inset: 0, display: "block", touchAction: "none" },
           }}
-          penColor="#000"
+          penColor="#0b3d91"
           backgroundColor="#fff"
         />
       </div>

@@ -125,7 +125,7 @@ async function buildAxaSecondWithAdvisor(base64: string, advisorSigRef: React.Mu
     } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
       sigX = 400; sigY = 135; // 350,200
     }
-    last2.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.14, height: img.height * 0.14, opacity: 1 });
+    last2.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.13, height: img.height * 0.13, opacity: 1 });
   }
   const final = await secondDoc.save();
   return final;
@@ -511,7 +511,7 @@ export default function Home() {
                 {showHint && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
                     <svg width="60%" height="60" viewBox="0 0 300 60">
-                      <path d="M5 40 C 40 10, 80 60, 120 30 S 200 40, 295 20" fill="none" stroke="#000" strokeWidth="3" style={{ animation: "stroke 2.6s ease-in-out infinite" }} />
+                      <path d="M5 40 C 40 10, 80 60, 120 30 S 200 40, 295 20" fill="none" stroke="#0b3d91" strokeWidth="3" style={{ animation: "stroke 2.6s ease-in-out infinite" }} />
                     </svg>
                   </div>
                 )}
@@ -521,7 +521,7 @@ export default function Home() {
                   canvasProps={{
                     style: { width: "100%", height: "100%", position: "absolute", inset: 0, display: "block", touchAction: "none" },
                   }}
-                  penColor="#000"
+                  penColor="#0b3d91"
                   backgroundColor="rgba(0,0,0,0)"
                 />
               </div>
@@ -598,7 +598,7 @@ export default function Home() {
                       canvasProps={{
                         style: { width: "100%", height: "100%", position: "absolute", inset: 0, display: "block", touchAction: "none" },
                       }}
-                      penColor="#000"
+                      penColor="#0b3d91"
                       backgroundColor="rgba(0,0,0,0)"
                     />
                   </div>
