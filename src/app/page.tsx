@@ -106,9 +106,9 @@ async function buildAxaSecondWithAdvisor(base64: string, advisorSigRef: React.Mu
   if (docType.includes("3A") && docType.toLowerCase().includes("ok") && !docType.toLowerCase().includes("non ok")) {
     dateY = 425; // align to signature Y below (415 for doc 2)
   } else if (docType.includes("3B") && docType.toLowerCase().includes("non ok")) {
-    dateY = 140;
-  } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
     dateY = 110;
+  } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
+    dateY = 135;
   }
   last2.drawText(dateStr, { x: 240, y: dateY, size: 12, font, color: rgb(0,0,0) });
   if (advisorSigRef.current && !(advisorSigRef.current as any).isEmpty()) {
@@ -117,15 +117,15 @@ async function buildAxaSecondWithAdvisor(base64: string, advisorSigRef: React.Mu
     let img;
     try { img = await secondDoc.embedPng(base64ToUint8Array(imgBase64)); } catch { img = await secondDoc.embedJpg(base64ToUint8Array(imgBase64)); }
     // signature X/Y vary with type
-    let sigX = 350; let sigY = 423;
+    let sigX = 400; let sigY = 423;
     if (docType.includes("3A") && docType.toLowerCase().includes("ok") && !docType.toLowerCase().includes("non ok")) {
-      sigX = 350; sigY = 415; // 350,415
+      sigX = 400; sigY = 415; // 350,415
     } else if (docType.includes("3B") && docType.toLowerCase().includes("non ok")) {
-      sigX = 350; sigY = 110;
+      sigX = 400; sigY = 110;
     } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
-      sigX = 350; sigY = 135; // 350,200
+      sigX = 400; sigY = 135; // 350,200
     }
-    last2.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.15, height: img.height * 0.15, opacity: 1 });
+    last2.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.14, height: img.height * 0.14, opacity: 1 });
   }
   const final = await secondDoc.save();
   return final;
