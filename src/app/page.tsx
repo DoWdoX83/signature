@@ -125,7 +125,7 @@ async function buildAxaSecondWithAdvisor(base64: string, advisorSigRef: React.Mu
     } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
       sigX = 400; sigY = 135; // 350,200
     }
-    last2.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.13, height: img.height * 0.13, opacity: 1 });
+    last2.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.17, height: img.height * 0.17, opacity: 1 });
   }
   const final = await secondDoc.save();
   return final;
