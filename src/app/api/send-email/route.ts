@@ -81,7 +81,7 @@ export async function POST(request: Request) {
           try { img = await pdfDoc.embedPng(Buffer.from(advisorSigPngBase64, "base64")); } catch { img = await pdfDoc.embedJpg(Buffer.from(advisorSigPngBase64, "base64")); }
           let sigX = 350, sigY = 408;
           if (docType?.includes("3A") && docType?.toLowerCase().includes("ok") && !docType?.toLowerCase().includes("non ok")) { sigX = 400; sigY = 400; }
-          else if (docType?.includes("3B") && docType?.toLowerCase().includes("ok")) { sigX = 350; sigY = 185; }
+          else if (docType?.includes("3B") && docType?.toLowerCase().includes("ok") && !docType?.toLowerCase().includes("non ok")) { sigX = 400; sigY = 185; }
           else if (docType?.includes("3B") && docType?.toLowerCase().includes("non ok")) { sigX = 400; sigY = 110; }
           page.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.15, height: img.height * 0.15, opacity: 1 });
         }

@@ -95,17 +95,17 @@ export async function POST(request: Request) {
       const type = String(docType || "");
       if (type.includes("3A") && type.toLowerCase().includes("non ok")) {
         offsetX = 400; offsetY = 423;
-      } else if (type.includes("3A") && type.toLowerCase().includes("ok")) {
-        offsetX = 400; offsetY = 465;
+      } else if (type.includes("3A") && type.toLowerCase().includes("ok") && !type.toLowerCase().includes("non ok")) {
+        offsetX = 400; offsetY = 470;
       } else if (type.includes("3B") && type.toLowerCase().includes("non ok")) {
         // Ajuste: déplacer davantage à droite et remonter
         offsetX = 400; offsetY = 180;
-      } else if (type.includes("3B") && type.toLowerCase().includes("ok")) {
+      } else if (type.includes("3B") && type.toLowerCase().includes("ok") && !type.toLowerCase().includes("non ok")) {
         // Descendre Y de 50 pour doc 1 (3B respecté)
         offsetX = 400; offsetY = 220;
       } else {
         // fallback to non ok 3A
-        offsetX = 380; offsetY = 423;
+        offsetX = 400; offsetY = 423;
       }
     } else {
       const scale = w > 0 && h > 0 ? Math.min(w / image.width, h / image.height) : 1;
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
         const type = String(docType || "");
         let dateY = 423;
         if (type.includes("3A") && type.toLowerCase().includes("ok") && !type.toLowerCase().includes("non ok")) {
-          dateY = 465; // aligne la date sur le Y de la signature doc 1
+          dateY = 470;
         } else if (type.includes("3B") && type.toLowerCase().includes("ok") && !type.toLowerCase().includes("non ok")) {
           dateY = 220;
         } else if (type.includes("3B") && type.toLowerCase().includes("non ok")) {
