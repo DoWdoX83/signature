@@ -83,7 +83,7 @@ export async function POST(request: Request) {
           if (docType?.includes("3A") && docType?.toLowerCase().includes("ok") && !docType?.toLowerCase().includes("non ok")) { sigX = 400; sigY = 400; }
           else if (docType?.includes("3B") && docType?.toLowerCase().includes("ok") && !docType?.toLowerCase().includes("non ok")) { sigX = 400; sigY = 185; }
           else if (docType?.includes("3B") && docType?.toLowerCase().includes("non ok")) { sigX = 400; sigY = 110; }
-          page.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.12, height: img.height * 0.12, opacity: 1 });
+          page.drawImage(img, { x: sigX, y: sigY, width: img.width * 0.3, height: img.height * 0.3, opacity: 1 });
         }
         const stamped = await pdfDoc.save();
         const stampedB64 = Buffer.from(stamped).toString("base64");

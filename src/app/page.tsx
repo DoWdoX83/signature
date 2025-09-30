@@ -156,6 +156,7 @@ export default function Home() {
   const [isMobile, setIsMobile] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string>("");
   const [isMobileQuery, setIsMobileQuery] = useState(false);
+  const [isGlobalDragActive, setIsGlobalDragActive] = useState(false);
 
   useEffect(() => {
     const el = sigContainerRef.current;
@@ -293,6 +294,56 @@ export default function Home() {
     setAxaSecondDocBase64(null);
     setIsTypeModalOpen(true);
   }, [pdfPreviewUrl, isMobileQuery]);
+
+  // Enable drag & drop from anywhere on the page (not only the dropzone box)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let dragCounter = 0;
+    const hasFiles = (e: DragEvent) => {
+      try {
+        const types = Array.from(e.dataTransfer?.types || []);
+        return types.includes("Files");
+      } catch { return false; }
+    };
+    const onDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragCounter++;
+      setIsGlobalDragActive(true);
+    };
+    const onDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+    };
+    const onDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragCounter = Math.max(0, dragCounter - 1);
+      if (dragCounter === 0) setIsGlobalDragActive(false);
+    };
+    const onDropAny = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragCounter = 0;
+      setIsGlobalDragActive(false);
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        const fileArr = [files[0]] as unknown as File[];
+        // Reuse existing handler
+        onDrop(fileArr);
+      }
+    };
+    window.addEventListener("dragenter", onDragEnter as any);
+    window.addEventListener("dragover", onDragOver as any);
+    window.addEventListener("dragleave", onDragLeave as any);
+    window.addEventListener("drop", onDropAny as any);
+    return () => {
+      window.removeEventListener("dragenter", onDragEnter as any);
+      window.removeEventListener("dragover", onDragOver as any);
+      window.removeEventListener("dragleave", onDragLeave as any);
+      window.removeEventListener("drop", onDropAny as any);
+    };
+  }, [onDrop]);
 
   const handleClear = useCallback(() => {
     sigRef.current?.clear();
@@ -432,6 +483,17 @@ export default function Home() {
 
   return (
     <div>
+      {/* Full-page drag overlay to accept drops anywhere */}
+      {isGlobalDragActive && (
+        <div className="fixed inset-0 z-[90]">
+          <div className="absolute inset-0 bg-black/10" />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="rounded-2xl border-2 border-dashed border-[var(--border-subtle)] bg-white/90 px-6 py-4 text-[#2d4c46]">
+              Déposez le PDF n'importe où pour l'importer
+            </div>
+          </div>
+        </div>
+      )}
       {/* Bandeau vert 1/3 écran */}
       <div className="min-h-[33vh] sm:min-h-[40vh] bg-[var(--brand-green)] flex items-center justify-center">
         <p className="text-white font-extrabold text-2xl sm:text-3xl -mt-52">Signature de document</p>
