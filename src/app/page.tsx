@@ -108,7 +108,7 @@ async function buildAxaSecondWithAdvisor(base64: string, advisorSigRef: React.Mu
   } else if (docType.includes("3B") && docType.toLowerCase().includes("non ok")) {
     dateY = 140;
   } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
-    dateY = 140;
+    dateY = 110;
   }
   last2.drawText(dateStr, { x: 240, y: dateY, size: 12, font, color: rgb(0,0,0) });
   if (advisorSigRef.current && !(advisorSigRef.current as any).isEmpty()) {
@@ -121,7 +121,7 @@ async function buildAxaSecondWithAdvisor(base64: string, advisorSigRef: React.Mu
     if (docType.includes("3A") && docType.toLowerCase().includes("ok") && !docType.toLowerCase().includes("non ok")) {
       sigX = 350; sigY = 415; // 350,415
     } else if (docType.includes("3B") && docType.toLowerCase().includes("non ok")) {
-      sigX = 350; sigY = 135;
+      sigX = 350; sigY = 110;
     } else if (docType.includes("3B") && docType.toLowerCase().includes("ok")) {
       sigX = 350; sigY = 135; // 350,200
     }

@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         } else if (docType?.includes("3B") && docType?.toLowerCase().includes("ok")) {
           dateY = 185;
         } else if (docType?.includes("3B") && docType?.toLowerCase().includes("non ok")) {
-          dateY = 110; // doc 2: 160 - 50
+          dateY = 110;
         } else if (!(docType?.includes("Axa"))) {
           dateY = 423;
         }
